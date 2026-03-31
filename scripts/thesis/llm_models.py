@@ -80,3 +80,39 @@ CWE_DESCRIPTIONS = {
     VulnerabilityCategory.LDAPI: "CWE-90: LDAP Injection - unvalidated data in LDAP queries",
     VulnerabilityCategory.XPATHI: "CWE-643: XPath Injection - unvalidated data in XPath queries",
 }
+
+
+class VerificationResult(BaseModel):
+    """Result of LLM verification for a single SAST finding (Stage 3)."""
+    
+    test_name: str = Field(
+        ...,
+        description="Test name, e.g., BenchmarkTest00018"
+    )
+    original_rule_id: str = Field(
+        ...,
+        description="The SAST rule ID that triggered the finding"
+    )
+    is_true_positive: bool = Field(
+        ...,
+        description="True if the finding is a real vulnerability, False if it should be filtered"
+    )
+    confidence: float = Field(
+        ...,
+        ge=0.0,
+        le=1.0,
+        description="Confidence score between 0.0 and 1.0"
+    )
+    reasoning: str = Field(
+        ...,
+        description="Brief explanation of why it is/isn't a true positive (1-2 sentences)"
+    )
+
+
+class BatchVerification(BaseModel):
+    """Batch verification result for multiple SAST findings (Stage 3)."""
+    
+    verifications: List[VerificationResult] = Field(
+        ...,
+        description="List of verification results for each SAST finding in the batch"
+    )

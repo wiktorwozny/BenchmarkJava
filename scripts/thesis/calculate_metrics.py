@@ -204,6 +204,33 @@ def parse_llm_results(llm_path: Path) -> tuple[list[Finding], dict]:
     return findings, tool_info
 
 
+def parse_filtered_results(filtered_path: Path) -> tuple[list[Finding], dict]:
+    """Parse SAST+LLM filtered results JSON (Stage 3 output)."""
+    with open(filtered_path, "r") as f:
+        data = json.load(f)
+    
+    tool_info = {
+        "name": f"SAST+LLM ({data.get('model', 'unknown')})",
+        "version": data.get('model', 'unknown'),
+        "original_findings": data.get("original_findings", 0),
+        "filtered_out": data.get("filtered_out", 0),
+    }
+    
+    findings = []
+    for result in data.get("results", []):
+        if result.get("is_true_positive", False):
+            findings.append(Finding(
+                test_name=result["test_name"],
+                rule_id=result.get("original_rule_id", "unknown"),
+                cwe=None,
+                message=result.get("reasoning", ""),
+                severity="warning",
+                file_path=f"{result['test_name']}.java"
+            ))
+    
+    return findings, tool_info
+
+
 def calculate_metrics(
     ground_truth: dict[str, GroundTruth],
     findings: list[Finding]
@@ -331,9 +358,9 @@ def main():
     parser.add_argument(
         "--input-format",
         type=str,
-        choices=["sarif", "llm"],
+        choices=["sarif", "llm", "filtered"],
         default="sarif",
-        help="Input format: 'sarif' for SAST tools, 'llm' for LLM analyzer (default: sarif)"
+        help="Input format: 'sarif' for SAST tools, 'llm' for LLM analyzer, 'filtered' for SAST+LLM (default: sarif)"
     )
     args = parser.parse_args()
     
@@ -344,8 +371,10 @@ def main():
     print(f"Parsing {args.input_format.upper()} file {args.results_file}")
     if args.input_format == "sarif":
         findings, tool_info = parse_sarif(args.results_file)
-    else:
+    elif args.input_format == "llm":
         findings, tool_info = parse_llm_results(args.results_file)
+    else:
+        findings, tool_info = parse_filtered_results(args.results_file)
     print(f"Found {len(findings)} findings from {tool_info.get('name', 'unknown')}")
     
     relevant_findings = [f for f in findings if f.test_name in ground_truth]

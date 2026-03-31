@@ -1,0 +1,2 @@
+# Requirements for thesis experiment scripts
+# No external dependencies needed - using only Python standard library

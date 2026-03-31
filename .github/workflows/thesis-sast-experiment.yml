@@ -1,0 +1,82 @@
+name: "Thesis SAST Experiment"
+
+on:
+  push:
+    branches:
+      - "wiktorwozny/thesis-sast"
+      - "main"
+      - "master"
+  pull_request:
+    branches:
+      - "wiktorwozny/thesis-sast"
+      - "main"
+      - "master"
+  workflow_dispatch:
+
+jobs:
+  sast-solo:
+    name: "Stage 1: SAST Solo (Semgrep)"
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      
+      - name: Install Semgrep
+        run: pip install semgrep
+      
+      - name: Get Semgrep version
+        id: semgrep-version
+        run: echo "version=$(semgrep --version)" >> $GITHUB_OUTPUT
+      
+      - name: Run Semgrep security audit
+        run: |
+          semgrep \
+            --config p/security-audit \
+            --sarif \
+            --output semgrep_results.sarif \
+            src/main/java/org/owasp/benchmark/testcode/
+        continue-on-error: true
+      
+      - name: Calculate metrics
+        run: |
+          mkdir -p results
+          python scripts/thesis/calculate_metrics.py \
+            semgrep_results.sarif \
+            --output-dir results \
+            --subset-file scripts/thesis/subset_tests.csv
+      
+      - name: Display results summary
+        run: |
+          echo "## SAST Solo Results (Semgrep)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          cat results/report.md >> $GITHUB_STEP_SUMMARY
+      
+      - name: Upload SARIF results
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-sarif
+          path: semgrep_results.sarif
+          retention-days: 30
+      
+      - name: Upload metrics
+        uses: actions/upload-artifact@v4
+        with:
+          name: sast-solo-metrics
+          path: |
+            results/metrics.json
+            results/report.md
+            results/details.json
+          retention-days: 30
+      
+      - name: Upload subset info
+        uses: actions/upload-artifact@v4
+        with:
+          name: experiment-config
+          path: scripts/thesis/subset_tests.csv
+          retention-days: 30

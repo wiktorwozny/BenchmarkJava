@@ -3,9 +3,11 @@ name: "Thesis SAST Experiment"
 on:
   push:
     branches:
+      - "wiktorwozny/thesis-sast"
       - "master"
   pull_request:
     branches:
+      - "wiktorwozny/thesis-sast"
       - "master"
   workflow_dispatch:
 

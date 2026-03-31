@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Calculate security metrics by comparing SAST tool output with ground truth.
+Calculate security metrics by comparing tool output with ground truth.
 
-This script parses SARIF output from Semgrep (or other SAST tools),
+This script parses output from SAST tools (SARIF format) or LLM analyzers (JSON format),
 maps findings to OWASP Benchmark test cases, and calculates Precision,
 Recall, and F1 scores both globally and per vulnerability category.
 """
@@ -172,6 +172,38 @@ def parse_sarif(sarif_path: Path) -> tuple[list[Finding], dict]:
     return findings, tool_info
 
 
+def parse_llm_results(llm_path: Path) -> tuple[list[Finding], dict]:
+    """Parse LLM analyzer JSON output and extract findings."""
+    with open(llm_path, "r") as f:
+        data = json.load(f)
+    
+    tool_info = {
+        "name": f"LLM ({data.get('model', 'unknown')})",
+        "version": data.get('model', 'unknown'),
+    }
+    
+    findings = []
+    for result in data.get("results", []):
+        if result.get("is_vulnerable", False):
+            category = result.get("category", "")
+            cwe = None
+            for cwe_num, cat in CWE_TO_CATEGORY.items():
+                if cat == category:
+                    cwe = cwe_num
+                    break
+            
+            findings.append(Finding(
+                test_name=result["test_name"],
+                rule_id=f"llm-{category}",
+                cwe=cwe,
+                message=result.get("reasoning", ""),
+                severity="warning",
+                file_path=f"{result['test_name']}.java"
+            ))
+    
+    return findings, tool_info
+
+
 def calculate_metrics(
     ground_truth: dict[str, GroundTruth],
     findings: list[Finding]
@@ -292,18 +324,28 @@ def generate_report(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Calculate SAST metrics against OWASP Benchmark")
-    parser.add_argument("sarif_file", type=Path, help="Path to SARIF results file")
+    parser = argparse.ArgumentParser(description="Calculate security metrics against OWASP Benchmark")
+    parser.add_argument("results_file", type=Path, help="Path to results file (SARIF or LLM JSON)")
     parser.add_argument("--output-dir", type=Path, default=Path("."), help="Output directory for results")
     parser.add_argument("--subset-file", type=Path, default=SUBSET_FILE, help="Path to subset CSV")
+    parser.add_argument(
+        "--input-format",
+        type=str,
+        choices=["sarif", "llm"],
+        default="sarif",
+        help="Input format: 'sarif' for SAST tools, 'llm' for LLM analyzer (default: sarif)"
+    )
     args = parser.parse_args()
     
     print(f"Loading ground truth from {args.subset_file}")
     ground_truth = load_ground_truth(args.subset_file)
     print(f"Loaded {len(ground_truth)} test cases")
     
-    print(f"Parsing SARIF file {args.sarif_file}")
-    findings, tool_info = parse_sarif(args.sarif_file)
+    print(f"Parsing {args.input_format.upper()} file {args.results_file}")
+    if args.input_format == "sarif":
+        findings, tool_info = parse_sarif(args.results_file)
+    else:
+        findings, tool_info = parse_llm_results(args.results_file)
     print(f"Found {len(findings)} findings from {tool_info.get('name', 'unknown')}")
     
     relevant_findings = [f for f in findings if f.test_name in ground_truth]

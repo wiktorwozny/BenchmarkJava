@@ -1,2 +1,6 @@
 # Requirements for thesis experiment scripts
-# No external dependencies needed - using only Python standard library
+
+# LLM integration
+instructor>=1.0.0
+openai>=1.0.0
+pydantic>=2.0.0

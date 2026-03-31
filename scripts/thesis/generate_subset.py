@@ -12,7 +12,7 @@ from pathlib import Path
 from collections import defaultdict
 
 SEED = 42
-TESTS_PER_CATEGORY = 50
+TESTS_PER_CATEGORY = 10  # ~100 total (10 per category * 11 categories)
 
 EXPECTED_RESULTS_FILE = Path(__file__).parent.parent.parent / "expectedresults-1.2.csv"
 OUTPUT_FILE = Path(__file__).parent / "subset_tests.csv"

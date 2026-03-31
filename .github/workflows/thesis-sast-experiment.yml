@@ -8,7 +8,7 @@ on:
   pull_request:
     branches:
       # - "wiktorwozny/thesis-sast"
-      - "master"
+      # - "master"
   workflow_dispatch:
     inputs:
       llm_model:

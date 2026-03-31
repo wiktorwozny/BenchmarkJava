@@ -57,26 +57,14 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           cat results/report.md >> $GITHUB_STEP_SUMMARY
       
-      - name: Upload SARIF results
+      - name: Upload results
         uses: actions/upload-artifact@v4
         with:
-          name: semgrep-sarif
-          path: semgrep_results.sarif
-          retention-days: 30
-      
-      - name: Upload metrics
-        uses: actions/upload-artifact@v4
-        with:
-          name: sast-solo-metrics
+          name: sast-solo-results
           path: |
+            semgrep_results.sarif
             results/metrics.json
             results/report.md
             results/details.json
-          retention-days: 30
-      
-      - name: Upload subset info
-        uses: actions/upload-artifact@v4
-        with:
-          name: experiment-config
-          path: scripts/thesis/subset_tests.csv
+            scripts/thesis/subset_tests.csv
           retention-days: 30

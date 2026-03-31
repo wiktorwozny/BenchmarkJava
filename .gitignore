@@ -15,3 +15,6 @@ testfiles/
 tools/Contrast/contrast.jar
 tools/Contrast/contrast.yaml
 tools/Contrast/working/
+
+thesis-results/
+thesis-results/*

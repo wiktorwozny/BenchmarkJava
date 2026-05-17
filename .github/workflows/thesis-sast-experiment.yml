@@ -1,0 +1,199 @@
+name: "Thesis Security Experiment"
+
+on:
+  push:
+    branches:
+      - "wiktorwozny/thesis-sast"
+      - "master"
+  # pull_request disabled to avoid duplicate runs when PR is open
+  # pull_request:
+  #   branches:
+  #     - "wiktorwozny/thesis-sast"
+  #     - "master"
+  workflow_dispatch:
+    inputs:
+      llm_model:
+        description: "LLM model to use"
+        required: false
+        default: "openai/gpt-5.2"
+        type: choice
+        options:
+          - "openai/gpt-4o-mini"
+          - "openai/gpt-5.2"
+      run_stage:
+        description: "Which stage to run"
+        required: false
+        default: "all"
+        type: choice
+        options:
+          - "all"
+          - "sast-solo"
+          - "llm-solo"
+          - "sast-llm"
+
+env:
+  DEFAULT_LLM_MODEL: "openai/gpt-5.2"
+
+jobs:
+  sast-solo:
+    name: "Stage 1: SAST Solo (Semgrep)"
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      
+      - name: Install Semgrep
+        run: pip install semgrep
+      
+      - name: Get Semgrep version
+        id: semgrep-version
+        run: echo "version=$(semgrep --version)" >> $GITHUB_OUTPUT
+      
+      - name: Run Semgrep security audit
+        run: |
+          semgrep \
+            --config p/security-audit \
+            --sarif \
+            --output semgrep_results.sarif \
+            src/main/java/org/owasp/benchmark/testcode/
+        continue-on-error: true
+      
+      - name: Calculate metrics
+        run: |
+          mkdir -p results
+          python scripts/thesis/calculate_metrics.py \
+            semgrep_results.sarif \
+            --output-dir results \
+            --subset-file scripts/thesis/subset_tests.csv
+      
+      - name: Display results summary
+        run: |
+          echo "## SAST Solo Results (Semgrep)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          cat results/report.md >> $GITHUB_STEP_SUMMARY
+      
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: sast-solo-results
+          path: |
+            semgrep_results.sarif
+            results/metrics.json
+            results/report.md
+            results/details.json
+            scripts/thesis/subset_tests.csv
+          retention-days: 30
+
+  llm-solo:
+    name: "Stage 2: LLM Solo"
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      
+      - name: Install dependencies
+        run: pip install -r scripts/thesis/requirements.txt
+      
+      - name: Run LLM analyzer
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          python scripts/thesis/llm_analyzer.py \
+            --model "${{ inputs.llm_model || env.DEFAULT_LLM_MODEL }}" \
+            --output llm_results.json
+      
+      - name: Calculate metrics
+        run: |
+          mkdir -p results
+          python scripts/thesis/calculate_metrics.py \
+            llm_results.json \
+            --input-format llm \
+            --output-dir results \
+            --subset-file scripts/thesis/subset_tests.csv
+      
+      - name: Display results summary
+        run: |
+          echo "## LLM Solo Results (${{ inputs.llm_model || env.DEFAULT_LLM_MODEL }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          cat results/report.md >> $GITHUB_STEP_SUMMARY
+      
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: llm-solo-results
+          path: |
+            llm_results.json
+            results/metrics.json
+            results/report.md
+            results/details.json
+          retention-days: 30
+
+  sast-llm:
+    name: "Stage 3: SAST + LLM"
+    runs-on: ubuntu-latest
+    needs: sast-solo
+    if: false  # DISABLED - already ran
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      
+      - name: Install dependencies
+        run: pip install -r scripts/thesis/requirements.txt
+      
+      - name: Download SAST results
+        uses: actions/download-artifact@v4
+        with:
+          name: sast-solo-results
+      
+      - name: Run LLM filter on SAST findings
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          python scripts/thesis/sast_llm_filter.py \
+            semgrep_results.sarif \
+            --model "${{ inputs.llm_model || env.DEFAULT_LLM_MODEL }}" \
+            --output filtered_results.json
+      
+      - name: Calculate metrics
+        run: |
+          mkdir -p results
+          python scripts/thesis/calculate_metrics.py \
+            filtered_results.json \
+            --input-format filtered \
+            --output-dir results \
+            --subset-file scripts/thesis/subset_tests.csv
+      
+      - name: Display results summary
+        run: |
+          echo "## SAST + LLM Results (${{ inputs.llm_model || env.DEFAULT_LLM_MODEL }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          cat results/report.md >> $GITHUB_STEP_SUMMARY
+      
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: sast-llm-results
+          path: |
+            filtered_results.json
+            results/metrics.json
+            results/report.md
+            results/details.json
+          retention-days: 30

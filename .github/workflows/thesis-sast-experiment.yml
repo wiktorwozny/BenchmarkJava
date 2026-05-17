@@ -93,7 +93,6 @@ jobs:
   llm-solo:
     name: "Stage 2: LLM Solo"
     runs-on: ubuntu-latest
-    if: false  # DISABLED - run sast-llm first
     
     steps:
       - name: Checkout repository
@@ -145,6 +144,7 @@ jobs:
     name: "Stage 3: SAST + LLM"
     runs-on: ubuntu-latest
     needs: sast-solo
+    if: false  # DISABLED - already ran
     
     steps:
       - name: Checkout repository

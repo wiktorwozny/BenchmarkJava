@@ -19,6 +19,16 @@ on:
         options:
           - "openai/gpt-4o-mini"
           - "openai/gpt-5.2"
+      run_stage:
+        description: "Which stage to run"
+        required: false
+        default: "all"
+        type: choice
+        options:
+          - "all"
+          - "sast-solo"
+          - "llm-solo"
+          - "sast-llm"
 
 env:
   DEFAULT_LLM_MODEL: "openai/gpt-5.2"
@@ -82,6 +92,7 @@ jobs:
   llm-solo:
     name: "Stage 2: LLM Solo"
     runs-on: ubuntu-latest
+    if: false  # DISABLED - run sast-llm first
     
     steps:
       - name: Checkout repository

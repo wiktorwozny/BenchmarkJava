@@ -5,10 +5,11 @@ on:
     branches:
       - "wiktorwozny/thesis-sast"
       - "master"
-  pull_request:
-    branches:
-      - "wiktorwozny/thesis-sast"
-      - "master"
+  # pull_request disabled to avoid duplicate runs when PR is open
+  # pull_request:
+  #   branches:
+  #     - "wiktorwozny/thesis-sast"
+  #     - "master"
   workflow_dispatch:
     inputs:
       llm_model:
